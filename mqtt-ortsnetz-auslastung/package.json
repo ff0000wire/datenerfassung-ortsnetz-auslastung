@@ -1,11 +1,13 @@
 {
   "name": "mqtt-ortsnetz-auslastung",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Liest L1-, L2-, L3-Spannung und Netzfrequenz per MQTT und überträgt sie an die Ortsnetz-Auslastung-API.",
+  "description": "Liest Spannung, Frequenz und optionale Messwerte des Hausanschlusses per MQTT und überträgt sie an die Ortsnetz-Auslastung-API.",
   "main": "ortsnetz-auslastung.js",
   "scripts": {
     "start": "node ortsnetz-auslastung.js",
+    "test": "node --test test-ortsnetz-auslastung.js",
+    "dry-run": "node ortsnetz-auslastung.js --dry-run",
     "docker:build": "docker build --build-arg VERSION=$npm_package_version --build-arg GIT_SHA=$(git log -1 --format=%h) -t $npm_package_config_imageRepo:$npm_package_version .",
     "docker:tag": "npm run docker:tag_latest && npm run docker:tag_git",
     "docker:tag_latest": "docker tag $npm_package_config_imageRepo:$npm_package_version $npm_package_config_imageRepo:latest",
@@ -18,7 +20,7 @@
   "dependencies": {
     "mqtt": "^5.5.0"
   },
-   "config": {
+  "config": {
     "imageRepo": "ghcr.io/your-github-user/mqtt-ortsnetz-auslastung",
     "imageName": "node_ortsnetz_auslastung",
     "imagePort": "0000"

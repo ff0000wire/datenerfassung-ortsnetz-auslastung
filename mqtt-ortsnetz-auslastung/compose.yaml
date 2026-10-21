@@ -1,0 +1,9 @@
+services:
+  ortsnetz-mqtt:
+    build: .
+    container_name: ortsnetz-mqtt
+    env_file: .env
+    environment:
+      ORTSNETZ_LATITUDE: "${ORTSNETZ_LATITUDE:?Breitengrad des Messorts in .env setzen}"
+      ORTSNETZ_LONGITUDE: "${ORTSNETZ_LONGITUDE:?Längengrad des Messorts in .env setzen}"
+    restart: unless-stopped

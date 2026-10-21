@@ -1,116 +1,98 @@
 # Ortsnetz-Auslastung für MQTT
 
-Ein eigenständiges Node.js-Script. Es abonniert drei Spannungs-Topics und optional ein Frequenz-Topic auf einem MQTT-Broker, prüft die Werte und übermittelt sie alle fünf Minuten per HTTPS an die Ortsnetz-Auslastung-API.
+Das Script abonniert Messwerte auf einem MQTT-Broker. Es prüft die Werte und sendet sie alle fünf Minuten an die Ortsnetz-Auslastung-API.
 
-Geeignet für alle Smart-Meter-Gateways, die ihre Messwerte per MQTT veröffentlichen, zum Beispiel [mbmd](https://github.com/volkszaehler/mbmd), Tasmota, evcc oder Shelly.
+Pflicht sind die Spannungen. Optional sendet das Script Netzfrequenz, Leistung, Strom und Leistungsfaktor am Hausanschluss, den Ladezustand des Speichers und eine PV-Prognose. Für Spannung und Frequenz bildet es Minimum, Mittelwert und Maximum über das Sendeintervall.
+
+Geeignet für alle Quellen, die Messwerte per MQTT veröffentlichen, z. B. [mbmd](https://github.com/volkszaehler/mbmd), Node-RED, Tasmota, evcc oder Shelly.
 
 ## Voraussetzungen
 
 - Node.js ab Version 24 oder Docker
-- Ein erreichbarer MQTT-Broker mit L1-, L2- und L3-Spannung in Volt
-- Internetzugang des ausführenden Hosts
+- MQTT-Broker mit der Spannung je Phase in Volt
+- Internetzugang
+- Koordinaten des Messorts, siehe [OpenStreetMap](https://www.openstreetmap.org/): Ort suchen, Rechtsklick, **„Abfrage starten“**
 
 ## Installation
 
-1. Repository klonen und in dieses Verzeichnis wechseln.
-2. `npm install` ausführen.
-3. Im `CONFIG`-Block von [ortsnetz-auslastung.js](ortsnetz-auslastung.js) `latitude`, `longitude`, `brokerUrl` und die Topics anpassen.
-4. Falls keine Frequenz verfügbar ist, `frequencyTopic: ''` eintragen.
-5. Falls keine PV-Prognose verfügbar ist, `solarForecastTopic: ''` eintragen.
-6. `npm start` ausführen. Nach dem Verbinden erfolgt ein erster Upload, danach alle fünf Minuten.
+1. Dieses Verzeichnis auf den Zielrechner kopieren.
+2. `npm ci` ausführen.
+3. Konfiguration eintragen: im `CONFIG`-Block von [ortsnetz-auslastung.js](ortsnetz-auslastung.js) oder per Umgebungsvariable.
+4. Probelauf ohne Übertragung: `npm run dry-run`. Nach `firstUploadDelayMs` (15 s) erscheint der Payload. Werte mit einer vorhandenen Anzeige vergleichen.
+5. Dauerbetrieb: `npm start`. Der erste Upload folgt 15 s nach dem Verbinden, danach alle fünf Minuten.
 
-Koordinaten lassen sich mit [OpenStreetMap](https://www.openstreetmap.org/) bestimmen: Standort suchen, Rechtsklick auf die Karte und **„Abfrage starten“** wählen.
+Bei ungültiger Konfiguration beendet sich das Script mit Exitcode 2.
 
 ## Konfiguration
 
-| Feld | Beschreibung |
-| --- | --- |
-| `latitude`, `longitude` | Standort der Messung |
-| `brokerUrl` | Broker-Adresse, z. B. `mqtt://broker:1883` oder `mqtts://broker:8883` |
-| `username`, `password` | Zugangsdaten; leer lassen, wenn der Broker anonym erlaubt |
-| `l1Topic`, `l2Topic`, `l3Topic` | Topics mit der Spannung je Phase in Volt |
-| `frequencyTopic` | Topic mit der Netzfrequenz in Hertz; `''` wenn nicht vorhanden |
-| `jsonKey` | Schlüssel innerhalb eines JSON-Payloads, z. B. `value` oder `data.voltage`; leer lassen bei reinen Zahlenwerten |
-| `solarForecastTopic` | Optionales Topic mit der EVCC PV-Tagesprognose in Wh; `''` wenn nicht vorhanden |
-| `solarForecastJsonKey` | Schlüssel innerhalb des JSON-Payloads der PV-Prognose, standardmäßig `today.energy` |
-| `maxValueAgeMs` | Maximales Alter eines empfangenen Werts; standardmäßig sechs Minuten bei einem Upload alle fünf Minuten |
-| `uploadIntervalMs` | Abstand zwischen zwei Uploads |
-| `smartmeterModel` | Freie Bezeichnung des Messgeräts |
-| `plant_capacity_kwp` | Installierte PV-Leistung in kWp |
+Jeder Schlüssel aus `CONFIG` lässt sich als Umgebungsvariable setzen: Großbuchstaben, Präfix `ORTSNETZ_`. Beispiel: `l1Topic` wird `ORTSNETZ_L1_TOPIC`. Eine nichtleere Umgebungsvariable hat Vorrang. Ein leeres Topic bedeutet: Wert nicht vorhanden.
 
-Beispiel:
+| Schlüssel | Pflicht | Beschreibung |
+| --- | --- | --- |
+| `latitude`, `longitude` | ja | Messort |
+| `brokerUrl`, `username`, `password` | ja | Broker, z. B. `mqtt://broker:1883`; Zugangsdaten leer bei anonymem Zugang |
+| `l1Topic`, `l2Topic`, `l3Topic` | ja | Spannung je Phase in V; bei einphasiger Messung fehlende Phasen leer lassen (Übertragung als `-1`) |
+| `frequencyTopic` | nein | Netzfrequenz in Hz |
+| `jsonKey` | nein | Schlüssel in einem JSON-Payload, z. B. `value` oder `data.voltage`; leer bei reinen Zahlen |
+| `gridPowerTopic` | nein | Wirkleistung gesamt in W, Bezug positiv, Einspeisung negativ |
+| `gridPowerInvert` | nein | `true`, wenn die Quelle Einspeisung positiv meldet |
+| `apparentPowerTopic` | nein | Scheinleistung gesamt in VA |
+| `powerFactorTopic` | nein | Leistungsfaktor; das Script überträgt den Betrag |
+| `l1CurrentTopic`, `l2CurrentTopic`, `l3CurrentTopic` | nein | Strom je Phase in A |
+| `batterySocTopic` | nein | Ladezustand des Speichers in % |
+| `solarForecastTopic`, `solarForecastJsonKey` | nein | PV-Tagesprognose in Wh, z. B. `evcc/site/forecast/solar` mit `today.energy` |
+| `smartmeterModel` | nein | Hersteller und Modell des Messgeräts, z. B. `Eastron SDM630` |
+| `plant_capacity_kwp` | nein | Installierte PV-Leistung in kWp; nötig für die PV-Prognose |
+| `battery_capacity_kwh` | nein | Nutzbare Speicherkapazität in kWh |
+| `maxValueAgeMs` | nein | Ältere Werte gelten als fehlend; Standard 6 min |
+| `uploadIntervalMs`, `firstUploadDelayMs` | nein | Sendeintervall (5 min) und Wartezeit vor dem ersten Upload (15 s) |
 
-```javascript
-const CONFIG = {
-    latitude: 52.520008,
-    longitude: 13.404954,
-    brokerUrl: 'mqtt://broker.local:1883',
-    username: '',
-    password: '',
-    l1Topic: 'mbmd/sdm1-1/Voltage/L1',
-    l2Topic: 'mbmd/sdm1-1/Voltage/L2',
-    l3Topic: 'mbmd/sdm1-1/Voltage/L3',
-    frequencyTopic: 'mbmd/sdm1-1/Frequency',
-    jsonKey: '',
-    solarForecastTopic: 'evcc/site/forecast/solar',
-    solarForecastJsonKey: 'today.energy',
-    maxValueAgeMs: 6 * 60 * 1000,
-    uploadIntervalMs: 5 * 60 * 1000,
-    smartmeterModel: 'SDM630',
-    plant_capacity_kwp: 7.41,
-};
-```
+Leistung, Strom und Leistungsfaktor nur vom Hausanschluss eintragen. Werte eines Wechselrichters oder einer einzelnen Phase sind nicht zulässig, siehe [API.md](../API.md).
 
-Topics lassen sich vorab prüfen:
-
-```bash
-mosquitto_sub -h broker.local -p 1883 -v -t 'mbmd/#'
-```
+Die statischen Angaben `smartmeterModel`, `plant_capacity_kwp` und `battery_capacity_kwh` sendet das Script nach jedem Start, bis die API eine Messung annimmt.
 
 ## Docker
 
-```bash
-npm run docker:build
-npm run docker:tag
-npm run docker:push
+```sh
+cp .env.example .env     # Koordinaten, Broker und Topics eintragen
+docker compose build
+docker compose run --rm ortsnetz-mqtt node ortsnetz-auslastung.js --dry-run
+docker compose up -d
+docker logs -f ortsnetz-mqtt
 ```
 
-Das Ziel-Repository steht unter `config.imageRepo` in [package.json](package.json) und muss vor einem Push auf die eigene Registry oder GitHub Container Registry angepasst werden.
+Ohne Koordinaten in `.env` startet Compose den Container nicht.
 
-## Verhalten und Fehleranalyse
+## Verhalten
 
-- Spannungswerte außerhalb von 150–300 V werden nicht übertragen.
-- Die Frequenz wird nur gesendet, wenn sie zwischen 45 und 55 Hz liegt.
-- Werte, die älter als `maxValueAgeMs` sind, gelten als fehlend; der Upload wird übersprungen.
-- Die PV-Prognose wird in Wh per MQTT von evcc empfangen und für die API in kWh umgerechnet. Ohne aktuellen Forecast wird kein Forecast-Feld übertragen und der Standort fließt nicht in die Forecast-Statistik ein.
-- Die installierte PV-Leistung wird mit jedem Upload übertragen.
-- Übertragungen erhalten eine Zeitüberschreitung von 10 Sekunden.
-- Meldet die API den Ampelstatus `yellow`, erscheint eine Warnung im Log.
-- Bei `Wert aus … nicht lesbar` Topic-Payload prüfen und ggf. `jsonKey` setzen.
+- Spannungen außerhalb von 150–300 V und Frequenzen außerhalb von 45–55 Hz gelten als unplausibel.
+- Fehlt eine konfigurierte Spannung oder ist sie unplausibel, überspringt das Script den Upload.
+- Unplausible Einzelwerte gehen nicht in Minimum, Mittelwert und Maximum ein.
+- Optionale Werte außerhalb des API-Wertebereichs lässt das Script weg. Es überträgt kein `0` und keine Schätzung als Ersatz.
+- Bei Scheinleistung 0 lässt das Script den Leistungsfaktor weg. Die API würde die Messung sonst ablehnen.
+- Ein Upload gilt nur bei HTTP `202` mit `accepted: true` als erfolgreich.
+- Bei Ampelstatus `yellow` oder `red` schreibt das Script eine Warnung ins Log.
 
-## API
+## Fehleranalyse
 
-```text
-POST https://www.ortsnetz-auslastung.de/v1/measurements
-Content-Type: application/json
+- `Spannung fehlt oder ist unplausibel`: Topics mit `mosquitto_sub -h broker.local -v -t '#'` prüfen. Sendet die Quelle seltener als alle sechs Minuten, `maxValueAgeMs` erhöhen.
+- `Wert aus … nicht lesbar`: Payload prüfen und ggf. `jsonKey` setzen.
+- `API hat die Messung nicht angenommen: HTTP 422`: Ein Wert verletzt den API-Wertebereich. Die Antwort im Log nennt das Feld.
+
+## Tests
+
+Ohne Broker und ohne Netzwerk:
+
+```sh
+npm test
 ```
 
-Beispiel-Payload:
+## Änderungen in Version 0.4.0
 
-```json
-{
-  "observed_at": "2026-09-15T08:00:00.000Z",
-  "latitude": 52.520008,
-  "longitude": 13.404954,
-  "l1_v": 230.1,
-  "l2_v": 229.9,
-  "l3_v": 230.4,
-  "grid_frequency_hz": 50,
-  "pv_forecast_kwh": 4.2,
-  "plant_capacity_kwp": 7.41,
-  "smartmeter_model": "SDM630",
-  "integration_version": "mqtt-0.3.0"
-}
-```
-
-Die API bestätigt angenommene Messungen mit HTTP `202`. Details siehe [API.md](../API.md).
+- Neue optionale Felder: Leistung, Scheinleistung, Leistungsfaktor, Strom, Ladezustand, Speicherkapazität sowie Minimum, Mittelwert und Maximum für Spannung und Frequenz.
+- Konfiguration auch per Umgebungsvariable, Probelauf mit `--dry-run`, Tests.
+- Keine Standardwerte mehr für Koordinaten, `plant_capacity_kwp` und `smartmeterModel`. Bisher sendete eine nicht angepasste Installation Berlin, 5 kWp und `SDM630`. Bestehende Installationen müssen diese Werte selbst setzen.
+- Statische Angaben gehen nicht mehr mit jedem Upload mit, sondern nach dem Start bis zur ersten angenommenen Messung.
+- Einphasige Messungen sind möglich.
+- Der erste Upload wartet 15 s auf Werte. Bisher folgte er sofort und scheiterte bei Quellen ohne Retain-Flag.
+- Das Log meldet nicht mehr jeden empfangenen Wert.

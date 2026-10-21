@@ -35,7 +35,7 @@ Dieses Repository bündelt Integrationen, die lokale Netzspannungsmessungen an d
 | [Tasmota SML-Lesekopf](#tasmota-sml-lesekopf) | Optische Smart-Meter-Schnittstelle | ESP32 / Tasmota Script | HTTPS / WebQuery | SML-fähige Stromzähler |
 | [Home Assistant](#home-assistant) | Vorhandene Spannungssensoren | Home Assistant / HACS | HTTPS | Home-Assistant-Installationen |
 | [ioBroker](#iobroker) | Vorhandene Spannungsdatenpunkte | ioBroker JavaScript | HTTPS | ioBroker-Installationen |
-| [MQTT](#mqtt) | MQTT-Topics | Node.js / Docker | HTTPS | Smart-Meter-Gateways mit MQTT und EVCC |
+| [MQTT](#mqtt) | MQTT-Topics | Node.js / Docker | HTTPS | Smart-Meter-Gateways, Node-RED und evcc mit MQTT |
 | [evcc](#evcc) | Shelly Gen2/3 oder Modbus TCP | Python / cron | HTTPS | evcc-Installationen mit direktem Zählerzugriff |
 | [Victron GX](#victron-gx) | VE.Bus oder Netzzähler über D-Bus | Python / Venus OS | HTTPS | Victron GX-Geräte |
 | [Carlo Gavazzi EM24 (Community)](#carlo-gavazzi-em24-community) | EM24 über mbmd / MQTT | Python / Linux / systemd | HTTPS | EM24-Installationen mit mbmd und MQTT |
@@ -99,13 +99,13 @@ Das Script verwendet den eingebauten Helfer `httpPost` und benötigt keine zusä
 
 ## MQTT
 
-Ein eigenständiges Node.js-Script abonniert drei Spannungs-Topics und optional ein Frequenz-Topic auf einem MQTT-Broker. Es unterstützt außerdem eine PV-Tagesprognose, zum Beispiel von evcc, und überträgt die Messwerte nach einem ersten Upload alle fünf Minuten per HTTPS.
+Ein eigenständiges Node.js-Script abonniert Messwerte auf einem MQTT-Broker und sendet sie alle fünf Minuten per HTTPS. Pflicht sind die Spannungen L1–L3, einphasige Messungen sind möglich. Optional überträgt es Netzfrequenz, Leistung, Scheinleistung, Leistungsfaktor und Strom am Hausanschluss, den Ladezustand des Speichers und eine PV-Tagesprognose, z. B. von evcc. Für Spannung und Frequenz bildet es Minimum, Mittelwert und Maximum über das Sendeintervall.
 
 - Ordner: [`mqtt-ortsnetz-auslastung`](mqtt-ortsnetz-auslastung)
-- Messquelle: Smart-Meter-Gateways oder andere Systeme mit MQTT-Topics für L1/L2/L3
+- Messquelle: Smart-Meter-Gateways, Node-RED oder andere Systeme mit MQTT-Topics
 - Voraussetzung: Node.js ab Version 24 oder Docker, erreichbarer MQTT-Broker und Internetzugang
 
-Die Konfiguration erfolgt im `CONFIG`-Block des Scripts. Unterstützt werden numerische Payloads sowie JSON-Payloads mit konfigurierbarem Schlüssel. Details stehen in der [MQTT-README](mqtt-ortsnetz-auslastung/README.md).
+Die Konfiguration erfolgt im `CONFIG`-Block des Scripts oder per Umgebungsvariable. Einen Probelauf ohne Übertragung startet `--dry-run`. Details stehen in der [MQTT-README](mqtt-ortsnetz-auslastung/README.md).
 
 ## evcc
 
