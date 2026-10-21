@@ -103,6 +103,23 @@ test('buildPayload lässt unplausible Werte aus der Statistik weg', () => {
     assert.equal(payload.l1_v_min, 229.0);
 });
 
+test('buildPayload sendet bei Minimalkonfiguration keine optionalen Felder', () => {
+    const payload = bridge.buildPayload(stateWith(VOLTAGES), config({ frequencyTopic: '' }), NOW);
+    assert.deepEqual(Object.keys(payload).sort(), [
+        'integration_version', 'l1_v', 'l1_v_avg', 'l1_v_max', 'l1_v_min', 'l2_v', 'l2_v_avg', 'l2_v_max',
+        'l2_v_min', 'l3_v', 'l3_v_avg', 'l3_v_max', 'l3_v_min', 'latitude', 'longitude', 'observed_at',
+    ]);
+});
+
+test('buildPayload lässt konfigurierte, aber nie empfangene Werte weg', () => {
+    const topics = { gridPowerTopic: 'p', apparentPowerTopic: 's', powerFactorTopic: 'pf', l1CurrentTopic: 'i1',
+        batterySocTopic: 'soc', solarForecastTopic: 'fc' };
+    const payload = bridge.buildPayload(stateWith(VOLTAGES), config({ frequencyTopic: '', ...topics }), NOW);
+    for (const field of ['grid_power_w', 'apparent_power_va', 'power_factor', 'l1_a', 'battery_soc_percent', 'pv_forecast_kwh']) {
+        assert.equal(field in payload, false, field);
+    }
+});
+
 test('buildPayload überspringt den Upload bei fehlender oder veralteter Spannung', () => {
     assert.equal(bridge.buildPayload(stateWith({ 'v/l1': 230, 'v/l2': 230 }), config(), NOW), null);
     assert.equal(bridge.buildPayload(stateWith({ ...VOLTAGES, 'v/l3': 120 }), config(), NOW), null);

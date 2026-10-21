@@ -70,6 +70,10 @@ const FREQUENCY_MIN = 45;
 const FREQUENCY_MAX = 55;
 const PHASES = ['l1', 'l2', 'l3'];
 
+// Wahr nur für endliche Zahlen. Vergleiche wie null >= 0 sind in JavaScript wahr.
+const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+const between = (value, min, max) => isNumber(value) && value >= min && value <= max;
+
 function envName(key) {
     return 'ORTSNETZ_' + key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
 }
@@ -178,7 +182,7 @@ function currentValue(state, topic, config, now) {
 
 // Minimum, Maximum und Mittelwert der plausiblen Werte seit dem letzten Upload.
 function statistics(state, topic, min, max) {
-    const values = (state.samples.get(topic) || []).filter((value) => value >= min && value <= max);
+    const values = (state.samples.get(topic) || []).filter((value) => between(value, min, max));
     if (values.length === 0) {
         return null;
     }
@@ -207,7 +211,7 @@ function buildPayload(state, config, now) {
             continue;
         }
         const voltage = value(topic);
-        if (!(voltage >= VOLTAGE_MIN && voltage <= VOLTAGE_MAX)) {
+        if (!between(voltage, VOLTAGE_MIN, VOLTAGE_MAX)) {
             return null;
         }
         payload[`${phase}_v`] = voltage;
@@ -220,7 +224,7 @@ function buildPayload(state, config, now) {
     }
 
     const frequency = value(config.frequencyTopic);
-    if (frequency >= FREQUENCY_MIN && frequency <= FREQUENCY_MAX) {
+    if (between(frequency, FREQUENCY_MIN, FREQUENCY_MAX)) {
         payload.grid_frequency_hz = frequency;
         const stats = statistics(state, config.frequencyTopic, FREQUENCY_MIN, FREQUENCY_MAX);
         if (stats) {
@@ -231,18 +235,18 @@ function buildPayload(state, config, now) {
     }
 
     const gridPower = value(config.gridPowerTopic);
-    if (Number.isFinite(gridPower)) {
+    if (isNumber(gridPower)) {
         payload.grid_power_w = config.gridPowerInvert ? -gridPower : gridPower;
     }
 
     const apparentPower = value(config.apparentPowerTopic);
-    if (apparentPower >= 0) {
+    if (isNumber(apparentPower) && apparentPower >= 0) {
         payload.apparent_power_va = apparentPower;
     }
 
     // Die API lehnt einen Leistungsfaktor bei Scheinleistung 0 ab (HTTP 422).
     const powerFactor = value(config.powerFactorTopic);
-    if (Number.isFinite(powerFactor) && Math.abs(powerFactor) <= 1 && payload.apparent_power_va !== 0) {
+    if (between(Math.abs(powerFactor ?? NaN), 0, 1) && payload.apparent_power_va !== 0) {
         payload.power_factor = Math.abs(powerFactor);
     }
 
@@ -256,19 +260,19 @@ function buildPayload(state, config, now) {
                 continue;
             }
             const current = value(topic);
-            if (current >= 0) {
+            if (isNumber(current) && current >= 0) {
                 payload[`${phase}_a`] = current;
             }
         }
     }
 
     const soc = value(config.batterySocTopic);
-    if (soc >= 0 && soc <= 100) {
+    if (between(soc, 0, 100)) {
         payload.battery_soc_percent = soc;
     }
 
     const pvForecast = value(config.solarForecastTopic);
-    if (pvForecast >= 0) {
+    if (isNumber(pvForecast) && pvForecast >= 0) {
         payload.pv_forecast_kwh = pvForecast / 1000; // MQTT liefert Wh, die API erwartet kWh.
     }
 
